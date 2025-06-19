@@ -1,26 +1,33 @@
-# Global Wildfire Clustering and Area Estimation (MODIS - May 3, 2025)
+# Wildfire Detection and Satellite Downlink Pipeline
 
-This MATLAB-based project analyzes NASA MODIS active fire data for May 3, 2025. It identifies spatial clusters of wildfire activity, calculates the area of each region in hectares, and visualizes the results on a global map using geospatial tools.
+This MATLAB & Simulink project explores how satellite data and signal processing can be combined to track wildfire risk and prioritize data downlink from a satellite constellation. The goal is to simulate a scalable, real-time response system for wildfire monitoring using Earth observation and satellite communications.
 
-## Key Results
+---
 
-- Date analyzed: May 3, 2025  
-- Fire regions identified: 592  
-- Estimated total area affected: 171,248 hectares
+## Key Features
 
-## Methods
+### Fire Region Detection & Analysis
+- Uses **NASA MODIS 24-hour active fire data**
+- Clusters fire points using **DBSCAN** (geospatial proximity)
+- Calculates region **area using convex hulls** and spherical geometry
+- Computes **average brightness** per region
+- Maps region centroids to a **Fire Weather Index (FWI)** image for local fire danger context
 
-- DBSCAN clustering (epsilon = 0.02°) to group nearby fire detections  
-- Convex hulls (`convhull`) to define cluster boundaries  
-- Area estimation using `areaint()` with the WGS84 ellipsoid  
-- Geospatial visualization using `geoplot` and `geopolyshape`
+### Satellite Assignment
+- Converts region centroids to **ECEF coordinates**
+- Loads a 66-satellite Iridium-like constellation using `satelliteScenario`
+- Computes distances to assign each fire region to its **nearest satellite**
 
-## Future Plans
+### Binary Encoding
+- Encodes each region’s data (lat, lon, area, brightness, FWI, priority) into **scaled binary strings**
+- Supports **sign-bit encoding** for lat/lon
+- Aggregates binary streams per satellite
 
-- Integrate with `satelliteScenario` to simulate satellite coverage over active fire zones  
-- Add time-based analysis 
-- Full satcom architecture with brightness adjustments
-- Data downlinks based off of priority
-- Full BPSK data conversion with longitude and latitude locations
-- RF signal link budgeting 
+### Simulink Downlink Simulation
+- Selects satellite ID to extract its associated bitstream
+- Simulates **BPSK modulation** based on binary data
+- Includes a scope to visualize the signal and transmitted bits
+- Supports sample-aligned processing with configurable parameters
+
+
 
