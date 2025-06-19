@@ -10,7 +10,7 @@ brightness = C.brightness;
 coords = [lat, lon];
 
 % DBSCAN clustering
-epsilon = 0.02;
+epsilon = 0.5;
 minPts = 3;
 clusterLabels = dbscan(coords, epsilon, minPts);
 
@@ -21,13 +21,14 @@ regionAreasHa   = zeros(numClusters, 1);
 avgBrightness   = zeros(numClusters, 1);
 
 for k = 1:numClusters
-    idx = clusterLabels == k;
-    if sum(idx) < 3, continue; end
+    clusterIdx = find(clusterLabels == k);
+    if numel(clusterIdx) < 3 || max(clusterIdx) > numel(lat)
+        continue
+    end
 
-    latk = lat(idx);
-    lonk = lon(idx);
+    latk = lat(clusterIdx);
+    lonk = lon(clusterIdx);
 
-    % Skip if fewer than 3 unique points or if points are collinear
     if numel(unique(latk)) < 2 || numel(unique(lonk)) < 2
         continue
     end
@@ -39,7 +40,7 @@ for k = 1:numClusters
         continue
     end
 
-    brightnessk = brightness(idx);
+    brightnessk = brightness(clusterIdx);
     latHull = latk(K);
     lonHull = lonk(K);
 
@@ -94,31 +95,63 @@ nRegions = size(regionCentroids, 1);
 fwiAtCentroids = NaN(nRegions, 1);
 
 for i = 1:nRegions
-    lat = regionCentroids(i, 1);
-    lon = regionCentroids(i, 2);
-    row = round((latRange(2) - lat) / diff(latRange) * rows);
-    col = round((lon - lonRange(1)) / diff(lonRange) * cols);
+    lat_i = regionCentroids(i, 1);
+    lon_i = regionCentroids(i, 2);
+    row = round((latRange(2) - lat_i) / diff(latRange) * rows);
+    col = round((lon_i - lonRange(1)) / diff(lonRange) * cols);
     row = max(min(row, rows), 1);
     col = max(min(col, cols), 1);
     fwiAtCentroids(i) = FWI(row, col);
 end
 
-%% Priority and Downlink
+%% Compute Priority and Sort Downlink Data
 priority = 0.7 * regionAreasHa + 0.3 * avgBrightness + 2 * fwiAtCentroids;
 priority = priority(:);  % Ensure column vector
 
 downlink = [regionCentroids, regionAreasHa, avgBrightness, fwiAtCentroids, priority];
 downlink = sortrows(downlink, 6, 'descend');
 
-%% Plot FWI Map and Centroids
+%% Plot FWI Map and Fire Cluster Hulls (no centroids)
 scaleFactor = 0.6;
 figure('Units', 'pixels', 'Position', [100 100 cols*scaleFactor rows*scaleFactor]);
 imagesc([lonRange(1), lonRange(2)], [latRange(2), latRange(1)], FWI); % flipped latitude axis
 axis xy
 axis image
-colormap(hot)
+colormap(gray)
 colorbar
-title("Fire Weather Index Map with Region Centroids")
-
+title("Fire Weather Index Map with Clustered Fire Regions")
+xlabel("Longitude")
+ylabel("Latitude")
 hold on
-plot(regionCentroids(:,2), regionCentroids(:,1), 'bo', 'MarkerFaceColor', 'b', 'MarkerSize', 4)
+
+% Overlay convex hull polygons only
+colors = lines(numClusters);  % Unique color per cluster
+
+for k = 1:numClusters
+    clusterIdx = find(clusterLabels == k);
+    if numel(clusterIdx) < 3 || max(clusterIdx) > numel(lat)
+        continue
+    end
+
+    latk = lat(clusterIdx);
+    lonk = lon(clusterIdx);
+
+    if numel(unique(latk)) < 2 || numel(unique(lonk)) < 2
+        continue
+    end
+
+    try
+        K = convhull(lonk, latk);
+    catch
+        warning("Skipping cluster %d: Convex hull failed.", k);
+        continue
+    end
+
+    latHull = latk(K);
+    lonHull = lonk(K);
+
+    fill(lonHull, latHull, colors(k,:), ...
+        'FaceAlpha', 1, ...
+        'EdgeColor', 'k', ...
+        'LineWidth', 0.5);
+end
